@@ -162,6 +162,7 @@ pub fn draw_chord(ctx: &Context, ui: &mut Ui, chord: &mut Chord) -> ChordDrawRes
             };
         }
 
+        // TODO: fix removing, removes multiple chords
         if ui.button("remove").clicked() {
             draw_result = ChordDrawResult::Remove;
         }

@@ -4,12 +4,14 @@ mod theory;
 mod chord;
 
 use std::collections::HashSet;
+use std::ops::Range;
 use eframe::Frame;
 use eframe::egui::*;
 use eframe::egui::panel::Side;
 use crate::chord::{Chord, ChordDrawResult, draw_chord, NotePos};
 use itertools::Itertools;
 use log::debug;
+use crate::theory::Note;
 
 fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
@@ -24,10 +26,14 @@ fn main() -> Result<(), eframe::Error> {
         notes: vec![(5, 5), (7, 4), (6, 3), (7, 2)]
     };
     let chords: Vec<Chord> = vec![chord, Chord::empty(2, "Cmaj7".to_owned()), Chord::empty(3, "Dmin7".to_owned()), Chord::empty(4, "Dmaj7".to_owned())];
+    let songs: Vec<Song> = vec![Song {
+        name: "How deep is your love".to_owned(),
+        text: "How deep is your love\n              Dmaj7\nIs your love, how deep is your love".to_owned()
+    }];
     // TODO: perform locally
     let state = Box::<MyGuitarApp>::new(MyGuitarApp{
         chords,
-        chords_for_deletion: vec![],
+        songs,
 
         selected_tab: Tab::Chords,
         selected_chord: "".to_owned(),
@@ -49,17 +55,11 @@ struct Song {
 
 struct MyGuitarApp {
     chords: Vec<Chord>,
-    chords_for_deletion: Vec<i32>,
+    songs: Vec<Song>,
 
     selected_tab: Tab,
     selected_chord: String,
     chord_search_input: String
-}
-
-impl MyGuitarApp {
-    fn delete_chord(&mut self, chord_id: i32) {
-        self.chords_for_deletion.push(chord_id);
-    }
 }
 
 #[derive(PartialEq)]
@@ -114,8 +114,7 @@ impl eframe::App for MyGuitarApp {
                         ui.horizontal(|ui| {
                             ui.label(RichText::new(self.selected_chord.clone()).font(FontId::proportional(24.0)));
                             if ui.button("+").clicked() {
-                                let incremented_id = self.chords.last().unwrap().id + 1;
-                                self.chords.push(Chord::empty(incremented_id, self.selected_chord.clone()))
+                                add_empty_chord(&mut self.chords, &self.selected_chord);
                             }
                         });
                         ui.horizontal(|ui| {
@@ -130,16 +129,63 @@ impl eframe::App for MyGuitarApp {
                             }
 
                             // delete chords if needed
-                            self.chords.retain(|chord| {
-                                !chords_to_delete.contains(&chord.id)
-                            })
+                            self.chords.retain(|chord| !chords_to_delete.contains(&chord.id))
                         });
                     }
                 }
                 Tab::Songs => {
-                    ui.label("Show me a song beach");
+                    let text_edit_output = TextEdit::multiline(&mut self.songs.first_mut().unwrap().text)
+                        .min_size(ui.available_size())
+                        .show(ui);
+
+                    if let Some(Some(cursor)) = text_edit_output.cursor_range.map(|cr| cr.single()) {
+                        let cursor_position = cursor.ccursor.index;
+                        let range = Range { start: cursor_position, end: cursor_position + 10 };
+                        let possible_chord_str = self.songs.first().unwrap().text.char_range(range)
+                            .clone()
+                            .replace("\n", " ")
+                            .split(' ')
+                            .next().unwrap().trim().to_owned();
+
+                        // display chord list
+                        let found_chord: Option<&mut Chord> = self.chords.iter_mut().find(|chord| chord.name == possible_chord_str);
+                        let chord_drawing_position = text_edit_output.text_clip_rect.min + Vec2::new(350.0, cursor.rcursor.row as f32 * 10.0);
+                        match found_chord {
+                            Some(chord) => {
+                                Window::new(&chord.name)
+                                    .fixed_pos(chord_drawing_position)
+                                    .show(ctx, |ui| {
+                                        ui.horizontal(|ui| {
+                                            draw_chord(ctx, ui, chord);
+                                        });
+                                    });
+                            },
+                            None if is_like_chord(&possible_chord_str) => {
+                                Window::new(&possible_chord_str).show(ctx, |ui| {
+                                    if(ui.button("Create")).clicked() {
+                                        add_empty_chord(&mut self.chords, &possible_chord_str)
+                                    }
+                                });
+                            },
+                            None => {
+
+                            }
+                        }
+                    }
                 }
             }
         });
     }
+}
+
+fn add_empty_chord(chords: &mut Vec<Chord>, name: &String) {
+    let last_id = chords.last().map(|c| c.id).unwrap_or(0);
+    chords.push(Chord::empty(last_id + 1, name.clone()))
+}
+
+fn is_like_chord(str: &String) -> bool {
+    let notes_chars = Note::all().map(|n| n.to_string().chars().next().unwrap());
+    str.starts_with(|c| {
+        notes_chars.contains(&c)
+    })
 }
