@@ -1,12 +1,11 @@
 
 
 use std::ops::Div;
-use crate::theory;
 
 use serde::{Serialize, Deserialize};
 use eframe::egui::*;
 use eframe::epaint::CircleShape;
-use theory::Note;
+use crate::models::Note;
 
 const STRING_NUMBER: i32 = 6;
 
@@ -131,7 +130,7 @@ pub fn draw_chord(ctx: &Context, ui: &mut Ui, chord: &mut Chord) -> ChordDrawRes
                 painter.text(
                     rect.min + Vec2::new(x_padding + x + (fret_distance / 2.0), HEIGHT - 7.5),
                     Align2::CENTER_CENTER,
-                    fret_string_from_number(fret_number),
+                    &fret_string_from_number(fret_number),
                     FontId::default(),
                     color
                 );
@@ -269,26 +268,26 @@ fn get_note_by_string_and_fret(note: NotePos) -> String {
 
 fn fret_string_from_number(i: i32) -> String {
     match i {
-        1 => String::from("I"),
-        2 => String::from("II"),
-        3 => String::from("III"),
-        4 => String::from("IV"),
-        5 => String::from("V"),
-        6 => String::from("VI"),
-        7 => String::from("VII"),
-        8 => String::from("VIII"),
-        9 => String::from("IX"),
-        10 => String::from("X"),
-        11 => String::from("XI"),
-        12 => String::from("XII"),
-        13 => String::from("XIII"),
-        14 => String::from("XIV"),
-        15 => String::from("XV"),
-        16 => String::from("XVI"),
-        17 => String::from("XVII"),
-        18 => String::from("XVIII"),
-        19 => String::from("XIX"),
-        20 => String::from("XX"),
+        1 => "I",
+        2 => "II",
+        3 => "III",
+        4 => "IV",
+        5 => "V",
+        6 => "VI",
+        7 => "VII",
+        8 => "VIII",
+        9 => "IX",
+        10 => "X",
+        11 => "XI",
+        12 => "XII",
+        13 => "XIII",
+        14 => "XIV",
+        15 => "XV",
+        16 => "XVI",
+        17 => "XVII",
+        18 => "XVIII",
+        19 => "XIX",
+        20 => "XX",
         _ => unimplemented!("Implement more frets you peace of shit")
-    }
+    }.to_string()
 }

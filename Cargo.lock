@@ -692,18 +692,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "docs-manager"
-version = "0.1.0"
-dependencies = [
- "eframe",
- "env_logger",
- "itertools",
- "log",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "downcast-rs"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1417,6 +1405,18 @@ dependencies = [
  "log",
  "wasi",
  "windows-sys 0.45.0",
+]
+
+[[package]]
+name = "my-guitar-app"
+version = "0.1.0"
+dependencies = [
+ "eframe",
+ "env_logger",
+ "itertools",
+ "log",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
