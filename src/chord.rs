@@ -3,12 +3,12 @@
 use std::ops::Div;
 use crate::theory;
 
+use serde::{Serialize, Deserialize};
 use eframe::egui::*;
 use eframe::epaint::CircleShape;
 use theory::Note;
 
 const STRING_NUMBER: i32 = 6;
-const MIN_FRET: i32 = 3;
 
 const HEIGHT: f32 = 160.0;
 const WIDTH: f32 = 220.0;
@@ -31,6 +31,7 @@ enum NoteExtraction {
     Muted
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Chord {
     pub id: i32,
     pub name: String,
@@ -58,6 +59,7 @@ pub fn draw_chord(ctx: &Context, ui: &mut Ui, chord: &mut Chord) -> ChordDrawRes
     let rect = response.rect;
 
     let fill = ctx.style().visuals.panel_fill;
+    let color = ctx.style().visuals.text_color();
     let distance_between_strings = (HEIGHT - (TOP_PADDING + BOTTOM_PADDING)) / (STRING_NUMBER - 1) as f32;
     // filter open strings
     let frets: Vec<i32> = chord.notes.iter().filter(|(fret, _)| *fret != 0).map(|(x, _)| *x).collect();
@@ -88,11 +90,11 @@ pub fn draw_chord(ctx: &Context, ui: &mut Ui, chord: &mut Chord) -> ChordDrawRes
         // draw muted string
         let is_muted = chord.notes.iter().filter(|(_, y)| *y == s).count() == 0;
         if is_muted {
-            draw_note_extraction(&painter, fill, rect.min + Vec2::new(LEFT_PADDING + 2.5, y), NoteExtraction::Muted);
+            draw_note_extraction(&painter, fill, color, rect.min + Vec2::new(LEFT_PADDING + 2.5, y), NoteExtraction::Muted);
         }
         let is_open = chord.notes.iter().filter(|(x, y)| *x == 0 && *y == s).count() == 1;
         if is_open {
-            draw_note_extraction(&painter, fill, rect.min + Vec2::new(LEFT_PADDING + 2.5, y), NoteExtraction::Note((0, s)));
+            draw_note_extraction(&painter, fill, color, rect.min + Vec2::new(LEFT_PADDING + 2.5, y), NoteExtraction::Note((0, s)));
         }
 
         // draw string
@@ -100,7 +102,7 @@ pub fn draw_chord(ctx: &Context, ui: &mut Ui, chord: &mut Chord) -> ChordDrawRes
         painter.line_segment([
                                  rect.min + Vec2::new(x_padding, y),
                                  rect.min + Vec2::new(WIDTH - RIGHT_PADDING, y)
-                             ], Stroke::new(STRING_THICKNESS, Color32::WHITE));
+                             ], Stroke::new(STRING_THICKNESS, color));
 
         // frets
         for f in 1..(fret_amount + 1) {
@@ -110,7 +112,7 @@ pub fn draw_chord(ctx: &Context, ui: &mut Ui, chord: &mut Chord) -> ChordDrawRes
             painter.line_segment([
                 rect.min + Vec2::new(x_padding + x, TOP_PADDING),
                 rect.min + Vec2::new(x_padding + x, HEIGHT - BOTTOM_PADDING)
-            ], Stroke::new(FRET_THICKNESS, Color32::WHITE));
+            ], Stroke::new(FRET_THICKNESS, color));
 
             // draw note if exist
             // filter open strings
@@ -120,7 +122,7 @@ pub fn draw_chord(ctx: &Context, ui: &mut Ui, chord: &mut Chord) -> ChordDrawRes
                 None => (),
                 Some(v) => {
                     let circle_center = rect.min + Vec2::new(x_padding + x + (fret_distance / 2.0), y);
-                    draw_note_extraction(&painter, fill, circle_center, NoteExtraction::Note(*v));
+                    draw_note_extraction(&painter, fill, color, circle_center, NoteExtraction::Note(*v));
                 }
             }
 
@@ -131,7 +133,7 @@ pub fn draw_chord(ctx: &Context, ui: &mut Ui, chord: &mut Chord) -> ChordDrawRes
                     Align2::CENTER_CENTER,
                     fret_string_from_number(fret_number),
                     FontId::default(),
-                    Color32::WHITE
+                    color
                 );
             }
         }
@@ -152,7 +154,7 @@ pub fn draw_chord(ctx: &Context, ui: &mut Ui, chord: &mut Chord) -> ChordDrawRes
                 }
             }
 
-            if ui.button("add fret").clicked() {
+            if ui.button("plus fret").clicked() {
                 for note in chord.notes.iter_mut() {
                     // don't move open notes around
                     if note.0 > 0 {
@@ -167,7 +169,7 @@ pub fn draw_chord(ctx: &Context, ui: &mut Ui, chord: &mut Chord) -> ChordDrawRes
             draw_result = ChordDrawResult::Remove;
         }
 
-        if ui.button("close").clicked() {
+        if ui.button("close menu").clicked() {
             ui.close_menu();
         }
     });
@@ -203,32 +205,32 @@ pub fn draw_chord(ctx: &Context, ui: &mut Ui, chord: &mut Chord) -> ChordDrawRes
     draw_result
 }
 
-fn draw_note_extraction(painter: &Painter, fill: Color32, pos: Pos2, note: NoteExtraction) {
+fn draw_note_extraction(painter: &Painter, fill: Color32, color: Color32, pos: Pos2, note: NoteExtraction) {
     match note {
         NoteExtraction::Note(note) => {
             painter.add(CircleShape {
                 center: pos,
                 radius: 10.0,
                 fill,
-                stroke: Stroke::new(FRET_THICKNESS, Color32::WHITE),
+                stroke: Stroke::new(FRET_THICKNESS, color),
             });
             painter.text(
                 pos,
                 Align2::CENTER_CENTER,
                 get_note_by_string_and_fret(note),
                 FontId::new(12.0, FontId::default().family),
-                Color32::WHITE
+                color
             );
         }
         NoteExtraction::Muted => {
             painter.line_segment([
                 pos + Vec2::new(-5.0, -5.0),
                 pos + Vec2::new(5.0, 5.0)
-            ], Stroke::new(1.0, Color32::WHITE));
+            ], Stroke::new(1.0, color));
             painter.line_segment([
                 pos + Vec2::new(5.0, -5.0),
                 pos + Vec2::new(-5.0, 5.0)
-            ], Stroke::new(1.0, Color32::WHITE));
+            ], Stroke::new(1.0, color));
         }
     }
 }
