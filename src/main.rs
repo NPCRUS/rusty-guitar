@@ -2,16 +2,17 @@
 
 mod chord;
 mod models;
+mod state;
 
 use std::collections::HashSet;
 use std::ops::Range;
 use eframe::{Frame, Storage};
-use serde::{Deserialize, Serialize};
 use eframe::egui::*;
 use eframe::egui::panel::Side;
 use crate::chord::{Chord, ChordDrawResult, draw_chord};
 use itertools::Itertools;
 use crate::models::{Note, Song};
+use crate::state::{Msg, run_messages, State, Tab};
 
 const STORAGE_KEY: &str = "state";
 
@@ -30,48 +31,17 @@ fn main() -> Result<(), eframe::Error> {
         Box::new(|_cc| {
              _cc.storage
                  .map(|s| s.get_string(STORAGE_KEY).unwrap_or("{}".to_owned()))
-                 .map(|str| serde_json::from_str::<MyGuitarApp>(&str).unwrap_or(MyGuitarApp::default()))
+                 .map(|str| serde_json::from_str::<State>(&str).unwrap_or(State::default()))
                  .map(|s| Box::new(s))
                  .unwrap()
         }),
     )
 }
 
-#[derive(PartialEq, Serialize, Deserialize)]
-enum Tab {
-    Chords,
-    Songs,
-}
-
-#[derive(Serialize, Deserialize)]
-struct MyGuitarApp {
-    chords: Vec<Chord>,
-    songs: Vec<Song>,
-
-    selected_tab: Tab,
-    selected_chord: String,
-    chord_search_input: String,
-    selected_song: String,
-    song_search_input: String
-}
-
-impl MyGuitarApp {
-    fn default() -> Self {
-        MyGuitarApp {
-            chords: vec![],
-            songs: vec![],
-
-            selected_tab: Tab::Chords,
-            selected_chord: "".to_owned(),
-            chord_search_input: "".to_owned(),
-            selected_song: "".to_owned(),
-            song_search_input: "".to_owned()
-        }
-    }
-}
-
-impl eframe::App for MyGuitarApp {
+impl eframe::App for State {
     fn update(&mut self, ctx: &Context, _frame: &mut Frame) {
+        let mut messages: Vec<Msg> = vec![];
+
         TopBottomPanel::top("tabs").show_separator_line(true).exact_height(30.0).show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.selectable_value(&mut self.selected_tab, Tab::Chords, "Chords");
@@ -80,9 +50,11 @@ impl eframe::App for MyGuitarApp {
         });
 
         match self.selected_tab {
-            Tab::Chords => chords_section(self, ctx),
-            Tab::Songs => songs_section(self, ctx)
+            Tab::Chords => chords_section(self, &mut messages, ctx),
+            Tab::Songs => songs_section(self, &mut messages, ctx)
         }
+
+        run_messages(self, &messages)
     }
 
     fn save(&mut self, _storage: &mut dyn Storage) {
@@ -90,7 +62,7 @@ impl eframe::App for MyGuitarApp {
     }
 }
 
-fn chords_section(state: &mut MyGuitarApp, ctx: &Context) {
+fn chords_section(state: &mut State, messages: &mut Vec<Msg>, ctx: &Context) {
     SidePanel::new(Side::Left, "search").show(ctx, |ui| {
         ui.text_edit_singleline(&mut state.chord_search_input);
         ui.separator();
@@ -119,7 +91,7 @@ fn chords_section(state: &mut MyGuitarApp, ctx: &Context) {
             ui.horizontal(|ui| {
                 ui.label(RichText::new(&state.selected_chord).font(FontId::proportional(24.0)));
                 if ui.button("+").clicked() {
-                    add_empty_chord(&mut state.chords, &state.selected_chord);
+                    messages.push(Msg::AddEmptyChord(state.selected_chord.clone()));
                 }
             });
             ui.horizontal(|ui| {
@@ -140,7 +112,7 @@ fn chords_section(state: &mut MyGuitarApp, ctx: &Context) {
     });
 }
 
-fn songs_section(state: &mut MyGuitarApp, ctx: &Context) {
+fn songs_section(state: &mut State, messages: &mut Vec<Msg>, ctx: &Context) {
     SidePanel::new(Side::Left, "search").show(ctx, |ui| {
         ui.horizontal(|ui| {
             ui.text_edit_singleline(&mut state.song_search_input);
@@ -221,7 +193,7 @@ fn songs_section(state: &mut MyGuitarApp, ctx: &Context) {
                             .fixed_pos(chord_drawing_position)
                             .show(ctx, |ui| {
                                 if(ui.button("Create")).clicked() {
-                                    add_empty_chord(&mut state.chords, &possible_chord_str.to_owned())
+                                    messages.push(Msg::AddEmptyChord(possible_chord_str.clone().to_string()));
                                 }
                             });
                     },
@@ -244,11 +216,6 @@ fn extract_word_from_cursor_position(text: &String, cursor_position: usize) -> &
         end_idx = end_idx + 1;
     }
     text.char_range(Range { start: start_idx, end: end_idx})
-}
-
-fn add_empty_chord(chords: &mut Vec<Chord>, name: &String) {
-    let last_id = chords.last().map(|c| c.id).unwrap_or(0);
-    chords.push(Chord::empty(last_id + 1, name.clone()))
 }
 
 fn is_like_chord(str: &str) -> bool {
