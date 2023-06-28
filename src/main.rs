@@ -9,24 +9,27 @@ use std::ops::Range;
 use eframe::{Frame, Storage};
 use eframe::egui::*;
 use eframe::egui::panel::Side;
+use env_logger::{Builder, Target};
 use crate::chord::{Chord, ChordDrawResult, draw_chord};
 use itertools::Itertools;
+use log::{debug, LevelFilter};
 use crate::models::{Note, Song};
 use crate::state::{Msg, run_messages, State, Tab};
 
 const STORAGE_KEY: &str = "state";
 
 fn main() -> Result<(), eframe::Error> {
-    env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
+    Builder::from_default_env().filter_level(LevelFilter::Debug).init(); // Log to stderr (if you run with `RUST_LOG=debug`).
     let options = eframe::NativeOptions {
         follow_system_theme: true,
         app_id: Some("MyGuitar".to_owned()),
         initial_window_size: Some(vec2(1920.0, 590.0)),
         ..Default::default()
     };
+    debug!("allo, chto");
 
     eframe::run_native(
-        "My guitar App",
+        "MyGuitar",
         options,
         Box::new(|_cc| {
              _cc.storage
@@ -205,17 +208,22 @@ fn songs_section(state: &mut State, messages: &mut Vec<Msg>, ctx: &Context) {
 }
 
 fn extract_word_from_cursor_position(text: &String, cursor_position: usize) -> &str {
-    let chars: Vec<char> = text.chars().collect();
-    let mut start_idx = cursor_position;
-    let stop_chars = [' ', '\n', '\t'];
-    while !stop_chars.contains(&chars[start_idx - 1]) {
-        start_idx = start_idx - 1;
+    if text.len() == 0 {
+        ""
+    } else {
+        debug!("cursor: {}, chars: {:?}", cursor_position, text.chars().collect::<Vec<_>>());
+        let chars: Vec<char> = text.chars().collect();
+        let mut start_idx = cursor_position;
+        let stop_chars = [' ', '\n', '\t'];
+        while !(start_idx < 1 || stop_chars.contains(&chars[start_idx - 1])) {
+            start_idx = start_idx - 1;
+        }
+        let mut end_idx = cursor_position;
+        while !stop_chars.contains(&chars[end_idx]) {
+            end_idx = end_idx + 1;
+        }
+        text.char_range(Range { start: start_idx, end: end_idx })
     }
-    let mut end_idx = cursor_position;
-    while !stop_chars.contains(&chars[end_idx]) {
-        end_idx = end_idx + 1;
-    }
-    text.char_range(Range { start: start_idx, end: end_idx})
 }
 
 fn is_like_chord(str: &str) -> bool {
