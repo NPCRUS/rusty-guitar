@@ -9,7 +9,7 @@ use std::ops::Range;
 use eframe::{Frame, Storage};
 use eframe::egui::*;
 use eframe::egui::panel::Side;
-use env_logger::{Builder, Target};
+use env_logger::Builder;
 use crate::chord::{Chord, ChordDrawResult, draw_chord};
 use itertools::Itertools;
 use log::{debug, LevelFilter};
@@ -98,18 +98,14 @@ fn chords_section(state: &mut State, messages: &mut Vec<Msg>, ctx: &Context) {
                 }
             });
             ui.horizontal(|ui| {
-                let mut chords_to_delete: Vec<i32> = vec![];
                 for chord in state.chords.iter_mut().filter(|chord| chord.name == state.selected_chord) {
                     match draw_chord(ctx, ui, chord) {
                         ChordDrawResult::Nothing => {}
                         ChordDrawResult::Remove => {
-                            chords_to_delete.push(chord.id);
+                            messages.push(Msg::DeleteChord(chord.id));
                         }
                     }
                 }
-
-                // delete chords if needed
-                state.chords.retain(|chord| !chords_to_delete.contains(&chord.id))
             });
         }
     });
@@ -211,15 +207,18 @@ fn extract_word_from_cursor_position(text: &String, cursor_position: usize) -> &
     if text.len() == 0 {
         ""
     } else {
-        debug!("cursor: {}, chars: {:?}", cursor_position, text.chars().collect::<Vec<_>>());
         let chars: Vec<char> = text.chars().collect();
         let mut start_idx = cursor_position;
         let stop_chars = [' ', '\n', '\t'];
         while !(start_idx < 1 || stop_chars.contains(&chars[start_idx - 1])) {
             start_idx = start_idx - 1;
         }
-        let mut end_idx = cursor_position;
-        while !stop_chars.contains(&chars[end_idx]) {
+        let mut end_idx = if cursor_position >= chars.len() {
+            chars.len() - 1
+        } else {
+            cursor_position
+        };
+        while !(end_idx <= chars.len() - 1 || stop_chars.contains(&chars[end_idx])) {
             end_idx = end_idx + 1;
         }
         text.char_range(Range { start: start_idx, end: end_idx })

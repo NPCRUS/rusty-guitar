@@ -43,7 +43,7 @@ pub enum Msg {
 fn run_message(state: &mut State, msg: &Msg) {
     match msg {
         Msg::DeleteChord(id) => {
-            ()
+            state.chords.retain(|chord| chord.id != *id);
         },
         Msg::AddEmptyChord(name) => {
             let last_id = state.chords.last().map(|c| c.id).unwrap_or(0);
