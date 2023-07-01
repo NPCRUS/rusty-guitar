@@ -6,6 +6,7 @@ mod state;
 
 use std::collections::HashSet;
 use std::ops::Range;
+use std::os::raw::c_ushort;
 use eframe::{Frame, Storage};
 use eframe::egui::*;
 use eframe::egui::panel::Side;
@@ -23,10 +24,9 @@ fn main() -> Result<(), eframe::Error> {
     let options = eframe::NativeOptions {
         follow_system_theme: true,
         app_id: Some("MyGuitar".to_owned()),
-        initial_window_size: Some(vec2(1920.0, 590.0)),
+        initial_window_size: Some(vec2(1920.0, 600.0)),
         ..Default::default()
     };
-    debug!("allo, chto");
 
     eframe::run_native(
         "MyGuitar",
@@ -82,7 +82,7 @@ fn chords_section(state: &mut State, messages: &mut Vec<Msg>, ctx: &Context) {
         for chord_name in chords_prepared {
             let label = SelectableLabel::new(state.selected_chord == chord_name, &chord_name);
             if ui.add(label).clicked() {
-                state.selected_chord = chord_name.clone();
+                messages.push(Msg::SelectChord(chord_name.clone()));
             }
         }
     });
@@ -116,7 +116,7 @@ fn songs_section(state: &mut State, messages: &mut Vec<Msg>, ctx: &Context) {
         ui.horizontal(|ui| {
             ui.text_edit_singleline(&mut state.song_search_input);
             if ui.button("+").clicked() && state.song_search_input.len() > 0 {
-                state.songs.push(Song::empty(state.song_search_input.clone()))
+                messages.push(Msg::AddEmptySong(state.song_search_input.clone()));
             }
         });
         ui.separator();
@@ -133,7 +133,7 @@ fn songs_section(state: &mut State, messages: &mut Vec<Msg>, ctx: &Context) {
         for song_name in songs_prepared {
             let label = SelectableLabel::new(state.selected_song == song_name, &song_name);
             if ui.add(label).clicked() {
-                state.selected_song = song_name.clone();
+                messages.push(Msg::SelectSong(song_name.clone()));
             }
         }
     });
@@ -145,7 +145,7 @@ fn songs_section(state: &mut State, messages: &mut Vec<Msg>, ctx: &Context) {
             let song = state.songs.iter_mut().find(|s| s.name == state.selected_song).unwrap();
 
             if ui.text_edit_singleline(&mut song.name).changed() {
-                state.selected_song = song.name.clone();
+                messages.push(Msg::SelectSong(song.name.clone()));
             }
             ui.separator();
             let text_edit_output = TextEdit::multiline(&mut song.text)
@@ -175,11 +175,13 @@ fn songs_section(state: &mut State, messages: &mut Vec<Msg>, ctx: &Context) {
                                     if found_chords_to_read.len() > 1 && ui.button(">").clicked() {
                                         match found_chords_to_read.iter().find(|c| c.id > chord.id) {
                                             Some(next_chord) => {
-                                                song.preferences.insert(next_chord.name.clone(), next_chord.id);
+                                                messages.push(Msg::InsertSongPreference(song.name.clone(), (*next_chord).clone()));
+                                                // song.preferences.insert(next_chord.name.clone(), next_chord.id);
                                             },
                                             None => {
                                                 let first_chord = found_chords_to_read.first().unwrap();
-                                                song.preferences.insert(first_chord.name.clone(), first_chord.id);
+                                                messages.push(Msg::InsertSongPreference(song.name.clone(), (*first_chord).clone()));
+                                                // song.preferences.insert(first_chord.name.clone(), first_chord.id);
                                             }
                                         }
 
@@ -208,26 +210,37 @@ fn extract_word_from_cursor_position(text: &String, cursor_position: usize) -> &
         ""
     } else {
         let chars: Vec<char> = text.chars().collect();
-        let mut start_idx = cursor_position;
         let stop_chars = [' ', '\n', '\t'];
+        // debug!("{}", cursor_position);
+
+        let mut start_idx = if cursor_position >= chars.len() {
+            chars.len() - 1
+        } else {
+            cursor_position
+        };
+        // debug!("start_idx: {}, len: {}", start_idx, chars.len());
         while !(start_idx < 1 || stop_chars.contains(&chars[start_idx - 1])) {
             start_idx = start_idx - 1;
         }
+
         let mut end_idx = if cursor_position >= chars.len() {
             chars.len() - 1
         } else {
             cursor_position
         };
-        while !(end_idx <= chars.len() - 1 || stop_chars.contains(&chars[end_idx])) {
+        // debug!("end_idx: {}, len: {}", end_idx, chars.len());
+        while !(end_idx == chars.len() - 1 || stop_chars.contains(&chars[end_idx])) {
             end_idx = end_idx + 1;
         }
+
+        // debug!("calc: {}, start_idx: {}, end_idx: {}", text.char_range(Range { start: start_idx, end: end_idx }), start_idx, end_idx);
         text.char_range(Range { start: start_idx, end: end_idx })
     }
 }
 
-fn is_like_chord(str: &str) -> bool {
+fn is_like_chord(possible_chord: &str) -> bool {
     let notes_chars = Note::all().map(|n| n.to_string().chars().next().unwrap());
-    str.starts_with(|c| {
+    possible_chord.starts_with(|c| {
         notes_chars.contains(&c)
     })
 }

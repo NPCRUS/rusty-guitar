@@ -37,17 +37,34 @@ pub enum Tab {
 
 pub enum Msg {
     DeleteChord(i32),
-    AddEmptyChord(String)
+    AddEmptyChord(String),
+    AddEmptySong(String),
+    SelectChord(String),
+    SelectSong(String),
+    InsertSongPreference(String, Chord)
 }
 
 fn run_message(state: &mut State, msg: &Msg) {
     match msg {
         Msg::DeleteChord(id) => {
             state.chords.retain(|chord| chord.id != *id);
-        },
+        }
         Msg::AddEmptyChord(name) => {
             let last_id = state.chords.last().map(|c| c.id).unwrap_or(0);
-            state.chords.push(Chord::empty(last_id + 1, name.clone()));
+            state.chords.push(Chord::empty(last_id + 1, name.to_owned()));
+        }
+        Msg::AddEmptySong(name) => {
+            state.songs.push(Song::empty(name.to_owned()))
+        }
+        Msg::SelectChord(name) => {
+            state.selected_chord = name.to_owned();
+        }
+        Msg::SelectSong(name) => {
+            state.selected_song = name.to_owned();
+        }
+        Msg::InsertSongPreference(song_name, chord) => {
+            state.songs.iter_mut().find(|s| s.name == *song_name)
+                .map(|s| s.preferences.insert(chord.name.to_owned(), chord.id.to_owned()));
         }
     }
 }
