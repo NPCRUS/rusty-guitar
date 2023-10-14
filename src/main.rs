@@ -6,15 +6,14 @@ mod state;
 
 use std::collections::HashSet;
 use std::ops::Range;
-use std::os::raw::c_ushort;
 use eframe::{Frame, Storage};
 use eframe::egui::*;
 use eframe::egui::panel::Side;
 use env_logger::Builder;
-use crate::chord::{Chord, ChordDrawResult, draw_chord};
+use crate::chord::{draw_chord};
 use itertools::Itertools;
 use log::{debug, LevelFilter};
-use crate::models::{Note, Song};
+use crate::models::{Chord, Note};
 use crate::state::{Msg, run_messages, State, Tab};
 
 const STORAGE_KEY: &str = "state";
@@ -99,12 +98,12 @@ fn chords_section(state: &mut State, messages: &mut Vec<Msg>, ctx: &Context) {
             });
             ui.horizontal(|ui| {
                 for chord in state.chords.iter_mut().filter(|chord| chord.name == state.selected_chord) {
-                    match draw_chord(ctx, ui, chord) {
-                        ChordDrawResult::Nothing => {}
-                        ChordDrawResult::Remove => {
-                            messages.push(Msg::DeleteChord(chord.id));
-                        }
+                    let mut notes = chord.notes.clone();
+                    let draw_response = draw_chord(ctx, ui, &mut notes);
+                    if draw_response.is_deleted {
+                        messages.push(Msg::DeleteChord(chord.id));
                     }
+                    chord.replace_notes(notes)
                 }
             });
         }
@@ -171,17 +170,18 @@ fn songs_section(state: &mut State, messages: &mut Vec<Msg>, ctx: &Context) {
                             .current_pos(chord_drawing_position)
                             .show(ctx, |ui| {
                                 ui.horizontal(|ui| {
-                                    draw_chord(ctx, ui, chord);
+                                    let mut notes = chord.notes.clone();
+                                    draw_chord(ctx, ui, &mut notes);
+                                    chord.replace_notes(notes);
+
                                     if found_chords_to_read.len() > 1 && ui.button(">").clicked() {
                                         match found_chords_to_read.iter().find(|c| c.id > chord.id) {
                                             Some(next_chord) => {
                                                 messages.push(Msg::InsertSongPreference(song.name.clone(), (*next_chord).clone()));
-                                                // song.preferences.insert(next_chord.name.clone(), next_chord.id);
                                             },
                                             None => {
                                                 let first_chord = found_chords_to_read.first().unwrap();
                                                 messages.push(Msg::InsertSongPreference(song.name.clone(), (*first_chord).clone()));
-                                                // song.preferences.insert(first_chord.name.clone(), first_chord.id);
                                             }
                                         }
 
@@ -194,7 +194,7 @@ fn songs_section(state: &mut State, messages: &mut Vec<Msg>, ctx: &Context) {
                             .fixed_pos(chord_drawing_position)
                             .show(ctx, |ui| {
                                 if(ui.button("Create")).clicked() {
-                                    messages.push(Msg::AddEmptyChord(possible_chord_str.clone().to_string()));
+                                    messages.push(Msg::AddEmptyChord(possible_chord_str.to_string()));
                                 }
                             });
                     },
@@ -229,7 +229,7 @@ fn extract_word_from_cursor_position(text: &String, cursor_position: usize) -> &
             cursor_position
         };
         // debug!("end_idx: {}, len: {}", end_idx, chars.len());
-        while !(end_idx == chars.len() - 1 || stop_chars.contains(&chars[end_idx])) {
+        while !(end_idx == chars.len() || stop_chars.contains(&chars[end_idx])) {
             end_idx = end_idx + 1;
         }
 

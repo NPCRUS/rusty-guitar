@@ -1,14 +1,13 @@
 
 
 use std::ops::Div;
-
-use serde::{Serialize, Deserialize};
 use eframe::egui::*;
 use eframe::epaint::CircleShape;
 use crate::models::Note;
 
 const STRING_NUMBER: i32 = 6;
 
+// TODO: extract into configuration
 const HEIGHT: f32 = 160.0;
 const WIDTH: f32 = 220.0;
 const LEFT_PADDING: f32 = 10.0;
@@ -30,30 +29,13 @@ enum NoteExtraction {
     Muted
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Chord {
-    pub id: i32,
-    pub name: String,
-    pub notes: Vec<NotePos>
+pub struct ChordResponse {
+    pub response: Response,
+    pub is_deleted: bool
 }
 
-impl Chord {
-    pub fn empty(id: i32, name: String) -> Self {
-        Self {
-            id,
-            name,
-            notes: vec![]
-        }
-    }
-}
-
-pub enum ChordDrawResult {
-    Nothing,
-    Remove
-}
-
-pub fn draw_chord(ctx: &Context, ui: &mut Ui, chord: &mut Chord) -> ChordDrawResult {
-    let mut draw_result = ChordDrawResult::Nothing;
+pub fn draw_chord(ctx: &Context, ui: &mut Ui, notes: &mut Vec<NotePos>) -> ChordResponse {
+    let mut is_deleted = false;
     let (response, painter)= ui.allocate_painter(Vec2::new(WIDTH, HEIGHT), Sense::click());
     let rect = response.rect;
 
@@ -61,7 +43,7 @@ pub fn draw_chord(ctx: &Context, ui: &mut Ui, chord: &mut Chord) -> ChordDrawRes
     let color = ctx.style().visuals.text_color();
     let distance_between_strings = (HEIGHT - (TOP_PADDING + BOTTOM_PADDING)) / (STRING_NUMBER - 1) as f32;
     // filter open strings
-    let frets: Vec<i32> = chord.notes.iter().filter(|(fret, _)| *fret != 0).map(|(x, _)| *x).collect();
+    let frets: Vec<i32> = notes.iter().filter(|(fret, _)| *fret != 0).map(|(x, _)| *x).collect();
     let min_fret = if frets.len() == 0 {
         1
     } else {
@@ -87,11 +69,11 @@ pub fn draw_chord(ctx: &Context, ui: &mut Ui, chord: &mut Chord) -> ChordDrawRes
         let y = s as f32 * distance_between_strings - distance_between_strings + TOP_PADDING;
 
         // draw muted string
-        let is_muted = chord.notes.iter().filter(|(_, y)| *y == s).count() == 0;
+        let is_muted = notes.iter().filter(|(_, y)| *y == s).count() == 0;
         if is_muted {
             draw_note_extraction(&painter, fill, color, rect.min + Vec2::new(LEFT_PADDING + 2.5, y), NoteExtraction::Muted);
         }
-        let is_open = chord.notes.iter().filter(|(x, y)| *x == 0 && *y == s).count() == 1;
+        let is_open = notes.iter().filter(|(x, y)| *x == 0 && *y == s).count() == 1;
         if is_open {
             draw_note_extraction(&painter, fill, color, rect.min + Vec2::new(LEFT_PADDING + 2.5, y), NoteExtraction::Note((0, s)));
         }
@@ -115,7 +97,7 @@ pub fn draw_chord(ctx: &Context, ui: &mut Ui, chord: &mut Chord) -> ChordDrawRes
 
             // draw note if exist
             // filter open strings
-            match chord.notes.iter()
+            match notes.iter()
                 .filter(|(fret, _)| *fret != 0)
                 .find(|(fret, string)| *fret == fret_number && *string == s) {
                 None => (),
@@ -140,11 +122,11 @@ pub fn draw_chord(ctx: &Context, ui: &mut Ui, chord: &mut Chord) -> ChordDrawRes
 
     // draw chord menu
     response.clone().context_menu(|ui| {
-        if chord.notes.len() > 0 {
+        if notes.len() > 0 {
             if ui.button("minus fret").clicked() {
-                let notes_on_first_fret = chord.notes.iter().find(|(x, _)| *x == 1);
+                let notes_on_first_fret = notes.iter().find(|(x, _)| *x == 1);
                 if notes_on_first_fret.is_none() {
-                    for note in chord.notes.iter_mut() {
+                    for note in notes.iter_mut() {
                         // don't move open notes around
                         if note.0 > 0 {
                             *note = (note.0 - 1, note.1)
@@ -154,7 +136,7 @@ pub fn draw_chord(ctx: &Context, ui: &mut Ui, chord: &mut Chord) -> ChordDrawRes
             }
 
             if ui.button("plus fret").clicked() {
-                for note in chord.notes.iter_mut() {
+                for note in notes.iter_mut() {
                     // don't move open notes around
                     if note.0 > 0 {
                         *note = (note.0 + 1, note.1)
@@ -165,7 +147,7 @@ pub fn draw_chord(ctx: &Context, ui: &mut Ui, chord: &mut Chord) -> ChordDrawRes
 
         // TODO: fix removing, removes multiple chords
         if ui.button("remove").clicked() {
-            draw_result = ChordDrawResult::Remove;
+            is_deleted = true;
         }
 
         if ui.button("close menu").clicked() {
@@ -190,18 +172,21 @@ pub fn draw_chord(ctx: &Context, ui: &mut Ui, chord: &mut Chord) -> ChordDrawRes
                     0
                 };
 
-                let note = chord.notes.iter().position(|(x, y)| *x == fret && *y == string);
+                let note = notes.iter().position(|(x, y)| *x == fret && *y == string);
                 match note {
-                    None => chord.notes.push((fret, string)),
+                    None => notes.push((fret, string)),
                     Some(pos) => {
-                        chord.notes.remove(pos);
+                        notes.remove(pos);
                     }
                 }
             }
         }
     }
 
-    draw_result
+    ChordResponse {
+        response,
+        is_deleted,
+    }
 }
 
 fn draw_note_extraction(painter: &Painter, fill: Color32, color: Color32, pos: Pos2, note: NoteExtraction) {
@@ -266,6 +251,7 @@ fn get_note_by_string_and_fret(note: NotePos) -> String {
     big_fret_board[idx].clone()
 }
 
+// TODO: dynamic roman number fret derivation
 fn fret_string_from_number(i: i32) -> String {
     match i {
         1 => "I",
@@ -288,6 +274,6 @@ fn fret_string_from_number(i: i32) -> String {
         18 => "XVIII",
         19 => "XIX",
         20 => "XX",
-        _ => unimplemented!("Implement more frets you peace of shit")
+        _ => unimplemented!("Implement more frets you piece of shit")
     }.to_string()
 }

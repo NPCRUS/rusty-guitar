@@ -1,6 +1,6 @@
-use crate::chord::Chord;
-use crate::models::Song;
+use crate::models::{Chord, Song};
 use serde::{Deserialize, Serialize};
+use crate::chord::NotePos;
 
 #[derive(Serialize, Deserialize)]
 pub struct State {
@@ -17,8 +17,25 @@ pub struct State {
 impl State {
     pub(crate) fn default() -> Self {
         State {
-            chords: vec![],
-            songs: vec![],
+            chords: vec![
+                Chord {
+                    id: 0,
+                    name: "Dmaj7".to_string(),
+                    notes: vec![
+                        (5, 5),
+                        (7, 4),
+                        (6, 3),
+                        (7, 2)
+                    ],
+                }
+            ],
+            songs: vec![
+                Song {
+                    name: "Test".to_string(),
+                    text: "              Dmaj7 \n The test song that starts with a chord".to_string(),
+                    preferences: Default::default(),
+                }
+            ],
 
             selected_tab: Tab::Chords,
             selected_chord: "".to_owned(),

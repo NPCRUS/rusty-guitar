@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fmt;
 use serde::{Serialize, Deserialize};
+use crate::chord::NotePos;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Note {
@@ -17,6 +18,27 @@ impl Note {
 impl fmt::Display for Note {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Chord {
+    pub id: i32,
+    pub name: String,
+    pub notes: Vec<NotePos>
+}
+
+impl Chord {
+    pub fn empty(id: i32, name: String) -> Self {
+        Self {
+            id,
+            name,
+            notes: vec![]
+        }
+    }
+
+    pub fn replace_notes(&mut self, notes: Vec<NotePos>) {
+        self.notes = notes
     }
 }
 
