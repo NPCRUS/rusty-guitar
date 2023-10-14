@@ -98,12 +98,10 @@ fn chords_section(state: &mut State, messages: &mut Vec<Msg>, ctx: &Context) {
             });
             ui.horizontal(|ui| {
                 for chord in state.chords.iter_mut().filter(|chord| chord.name == state.selected_chord) {
-                    let mut notes = chord.notes.clone();
-                    let draw_response = draw_chord(ctx, ui, &mut notes);
+                    let draw_response = draw_chord(ctx, ui, &mut chord.notes);
                     if draw_response.is_deleted {
                         messages.push(Msg::DeleteChord(chord.id));
                     }
-                    chord.replace_notes(notes)
                 }
             });
         }
@@ -170,9 +168,7 @@ fn songs_section(state: &mut State, messages: &mut Vec<Msg>, ctx: &Context) {
                             .current_pos(chord_drawing_position)
                             .show(ctx, |ui| {
                                 ui.horizontal(|ui| {
-                                    let mut notes = chord.notes.clone();
-                                    draw_chord(ctx, ui, &mut notes);
-                                    chord.replace_notes(notes);
+                                    draw_chord(ctx, ui, &mut chord.notes);
 
                                     if found_chords_to_read.len() > 1 && ui.button(">").clicked() {
                                         match found_chords_to_read.iter().find(|c| c.id > chord.id) {

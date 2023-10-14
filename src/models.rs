@@ -36,10 +36,6 @@ impl Chord {
             notes: vec![]
         }
     }
-
-    pub fn replace_notes(&mut self, notes: Vec<NotePos>) {
-        self.notes = notes
-    }
 }
 
 #[derive(Serialize, Deserialize)]

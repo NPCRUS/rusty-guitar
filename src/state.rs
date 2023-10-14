@@ -1,6 +1,5 @@
 use crate::models::{Chord, Song};
 use serde::{Deserialize, Serialize};
-use crate::chord::NotePos;
 
 #[derive(Serialize, Deserialize)]
 pub struct State {
